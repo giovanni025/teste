@@ -2,6 +2,7 @@ import express from 'express';
 import { UserService } from '../services/UserService';
 import { HistoryService } from '../services/HistoryService';
 import { authenticateToken, optionalAuth, AuthenticatedRequest } from '../middleware/auth';
+import { prisma } from '../config/database';
 
 const router = express.Router();
 const userService = new UserService();
@@ -12,7 +13,8 @@ router.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    service: 'Aviator Backend API'
+    service: 'Aviator Backend API',
+    database: 'SQLite'
   });
 });
 
@@ -233,6 +235,32 @@ router.get('/stats', async (req, res) => {
 
   } catch (error) {
     console.error('Stats error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      status: false 
+    });
+  }
+});
+
+// Database info endpoint
+router.get('/db-info', async (req, res) => {
+  try {
+    const userCount = await prisma.user.count();
+    const gameCount = await prisma.gameHistory.count();
+    const betCount = await prisma.betHistory.count();
+
+    res.json({
+      status: true,
+      data: {
+        database: 'SQLite',
+        users: userCount,
+        games: gameCount,
+        bets: betCount
+      }
+    });
+
+  } catch (error) {
+    console.error('DB info error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       status: false 

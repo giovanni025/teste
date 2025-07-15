@@ -1,13 +1,13 @@
-import { GameHistory } from '../models/GameHistory';
-import { BetHistory } from '../models/BetHistory';
+import { prisma } from '../config/database';
 
 export class HistoryService {
   public async getRecentHistory(limit: number = 50): Promise<number[]> {
     try {
-      const history = await GameHistory.find()
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .select('crashPoint');
+      const history = await prisma.gameHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: { crashPoint: true }
+      });
       
       return history.map(h => h.crashPoint);
     } catch (error) {
@@ -21,13 +21,14 @@ export class HistoryService {
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
-      const topBets = await BetHistory.find({
-        createdAt: { $gte: startOfDay },
-        cashouted: true
-      })
-      .sort({ winAmount: -1 })
-      .limit(10)
-      .lean();
+      const topBets = await prisma.betHistory.findMany({
+        where: {
+          createdAt: { gte: startOfDay },
+          cashouted: true
+        },
+        orderBy: { winAmount: 'desc' },
+        take: 10
+      });
 
       return topBets.map(bet => ({
         betAmount: bet.betAmount,
@@ -47,13 +48,14 @@ export class HistoryService {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const topBets = await BetHistory.find({
-        createdAt: { $gte: startOfMonth },
-        cashouted: true
-      })
-      .sort({ winAmount: -1 })
-      .limit(10)
-      .lean();
+      const topBets = await prisma.betHistory.findMany({
+        where: {
+          createdAt: { gte: startOfMonth },
+          cashouted: true
+        },
+        orderBy: { winAmount: 'desc' },
+        take: 10
+      });
 
       return topBets.map(bet => ({
         betAmount: bet.betAmount,
@@ -73,13 +75,14 @@ export class HistoryService {
       startOfYear.setMonth(0, 1);
       startOfYear.setHours(0, 0, 0, 0);
 
-      const topBets = await BetHistory.find({
-        createdAt: { $gte: startOfYear },
-        cashouted: true
-      })
-      .sort({ winAmount: -1 })
-      .limit(10)
-      .lean();
+      const topBets = await prisma.betHistory.findMany({
+        where: {
+          createdAt: { gte: startOfYear },
+          cashouted: true
+        },
+        orderBy: { winAmount: 'desc' },
+        take: 10
+      });
 
       return topBets.map(bet => ({
         betAmount: bet.betAmount,
@@ -95,13 +98,14 @@ export class HistoryService {
 
   public async getUserBetHistory(username: string): Promise<any[]> {
     try {
-      const history = await BetHistory.find({ username })
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .lean();
+      const history = await prisma.betHistory.findMany({
+        where: { username },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
 
       return history.map(bet => ({
-        _id: bet._id,
+        _id: bet.id,
         name: bet.username,
         betAmount: bet.betAmount,
         cashoutAt: bet.cashoutAt || 0,

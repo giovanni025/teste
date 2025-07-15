@@ -1,7 +1,6 @@
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
-import { GameHistory } from '../models/GameHistory';
-import { BetHistory } from '../models/BetHistory';
+import { prisma } from '../config/database';
 import { ProvablyFair } from '../utils/ProvablyFair';
 
 export interface GameState {
@@ -186,18 +185,20 @@ export class GameManager {
     for (const [socketId, bet] of this.currentBets) {
       try {
         // Save bet history
-        await new BetHistory({
-          userId: bet.userId,
-          username: bet.name,
-          roundId: this.currentRoundId,
-          betAmount: bet.betAmount,
-          cashoutAt: bet.cashouted ? bet.target : undefined,
-          winAmount: bet.cashouted ? bet.cashOut : 0,
-          cashouted: bet.cashouted,
-          betType: bet.betType,
-          isAuto: bet.isAuto,
-          target: bet.target
-        }).save();
+        await prisma.betHistory.create({
+          data: {
+            userId: bet.userId,
+            username: bet.name,
+            roundId: this.currentRoundId,
+            betAmount: bet.betAmount,
+            cashoutAt: bet.cashouted ? bet.target : undefined,
+            winAmount: bet.cashouted ? bet.cashOut : 0,
+            cashouted: bet.cashouted,
+            betType: bet.betType,
+            isAuto: bet.isAuto,
+            target: bet.target
+          }
+        });
 
         // Prepare result for user
         results.set(socketId, {
@@ -247,16 +248,18 @@ export class GameManager {
         .filter(bet => bet.cashouted)
         .reduce((sum, bet) => sum + bet.cashOut, 0);
 
-      await new GameHistory({
-        roundId: this.currentRoundId,
-        crashPoint: this.crashPoint,
-        startTime: new Date(this.gameStartTime),
-        endTime: new Date(),
-        totalBets,
-        totalWinnings,
-        playerCount: this.currentBets.size,
-        seed: this.provablyFair.getCurrentSeed()
-      }).save();
+      await prisma.gameHistory.create({
+        data: {
+          roundId: this.currentRoundId,
+          crashPoint: this.crashPoint,
+          startTime: new Date(this.gameStartTime),
+          endTime: new Date(),
+          totalBets,
+          totalWinnings,
+          playerCount: this.currentBets.size,
+          seed: this.provablyFair.getCurrentSeed()
+        }
+      });
 
     } catch (error) {
       console.error('Error saving game history:', error);
@@ -265,10 +268,11 @@ export class GameManager {
 
   private async broadcastHistory(): Promise<void> {
     try {
-      const history = await GameHistory.find()
-        .sort({ createdAt: -1 })
-        .limit(50)
-        .select('crashPoint');
+      const history = await prisma.gameHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: { crashPoint: true }
+      });
       
       const historyArray = history.map(h => h.crashPoint);
       this.io.to('game-room').emit('history', historyArray);

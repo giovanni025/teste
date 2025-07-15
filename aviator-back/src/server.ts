@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDatabase } from './config/database';
+import { connectDatabase, prisma } from './config/database';
 import { GameManager } from './services/GameManager';
 import { UserService } from './services/UserService';
 import { HistoryService } from './services/HistoryService';
@@ -35,7 +35,11 @@ app.use('/api', apiRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    database: 'SQLite'
+  });
 });
 
 // Initialize services
@@ -204,11 +208,16 @@ gameManager.startGameLoop();
 // Connect to database and start server
 const PORT = process.env.PORT || 3001;
 
-connectDatabase().then(() => {
+connectDatabase().then(async () => {
+  // Initialize database with Prisma
+  await prisma.$executeRaw`PRAGMA foreign_keys = ON`;
+  
   server.listen(PORT, () => {
     console.log(`🚀 Aviator Backend Server running on port ${PORT}`);
     console.log(`🎮 Game loop started`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📊 Database: SQLite`);
+    console.log(`📁 Database file: aviator-back/prisma/dev.db`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }).catch((error) => {
   console.error('Failed to connect to database:', error);
@@ -216,8 +225,17 @@ connectDatabase().then(() => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
+  await prisma.$disconnect();
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await prisma.$disconnect();
   server.close(() => {
     console.log('Process terminated');
   });

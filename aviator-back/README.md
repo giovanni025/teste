@@ -1,6 +1,6 @@
 # Aviator Backend Server 🚀
 
-Backend server for the Aviator crash game built with Node.js, TypeScript, Socket.IO, and MongoDB.
+Backend server for the Aviator crash game built with Node.js, TypeScript, Socket.IO, and SQLite.
 
 ## 📋 Features
 
@@ -9,7 +9,7 @@ Backend server for the Aviator crash game built with Node.js, TypeScript, Socket
 - **User Management**: Registration, authentication, and balance management
 - **Game History**: Complete betting and game round history
 - **RESTful API**: HTTP endpoints for data retrieval
-- **MongoDB Integration**: Persistent data storage
+- **SQLite Database**: Lightweight, file-based database (no server required)
 - **TypeScript**: Full type safety and modern JavaScript features
 
 ## 🛠️ Tech Stack
@@ -18,7 +18,7 @@ Backend server for the Aviator crash game built with Node.js, TypeScript, Socket
 - **Language**: TypeScript
 - **Framework**: Express.js
 - **Real-time**: Socket.IO
-- **Database**: MongoDB with Mongoose
+- **Database**: SQLite with Prisma ORM
 - **Authentication**: JWT (JSON Web Tokens)
 - **Encryption**: bcryptjs for password hashing
 - **Environment**: dotenv for configuration
@@ -36,27 +36,25 @@ cd aviator-back
 npm install
 ```
 
-3. **Set up environment variables**
+3. **Set up database**
 ```bash
-cp .env.example .env
+# Generate Prisma client
+npx prisma generate
+
+# Create and migrate database
+npx prisma db push
+
+# Seed database with demo users (optional)
+npm run db:seed
 ```
 
-Edit the `.env` file with your configuration:
+4. **Environment variables**
+The `.env` file is already configured for SQLite:
 ```env
+DATABASE_URL="file:./dev.db"
 PORT=3001
-NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/aviator-game
-JWT_SECRET=your-super-secret-jwt-key-here
-JWT_EXPIRES_IN=7d
-MIN_BET=1
-MAX_BET=1000
-GAME_DURATION=5000
-CRASH_PROBABILITY=0.03
-FRONTEND_URL=http://localhost:3000
+JWT_SECRET=aviator-super-secret-jwt-key-2024-sqlite
 ```
-
-4. **Start MongoDB**
-Make sure MongoDB is running on your system.
 
 5. **Build and run**
 ```bash
@@ -101,6 +99,7 @@ multiplier = 1 + 0.06 * time + (0.06 * time)² - (0.04 * time)³ + (0.04 * time)
 - `GET /api/get-month-history` - Top wins this month
 - `GET /api/get-year-history` - Top wins this year
 - `GET /api/stats` - Game statistics
+- `GET /api/db-info` - Database information
 
 ### User Management
 - `POST /api/update-balance` - Update user balance (protected)
@@ -123,84 +122,91 @@ multiplier = 1 + 0.06 * time + (0.06 * time)² - (0.04 * time)³ + (0.04 * time)
 - `error` - Error messages
 - `success` - Success messages
 
-## 📊 Database Schema
+## 📊 Database Schema (SQLite)
 
 ### Users
-```typescript
-{
-  username: string;
-  email: string;
-  password: string; // hashed
-  balance: number;
-  avatar?: string;
-  isActive: boolean;
-  lastLogin?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+```sql
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  balance REAL DEFAULT 1000,
+  avatar TEXT,
+  isActive BOOLEAN DEFAULT true,
+  lastLogin DATETIME,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ### Game History
-```typescript
-{
-  roundId: string;
-  crashPoint: number;
-  startTime: Date;
-  endTime: Date;
-  totalBets: number;
-  totalWinnings: number;
-  playerCount: number;
-  seed: string;
-  createdAt: Date;
-}
+```sql
+CREATE TABLE game_history (
+  id TEXT PRIMARY KEY,
+  roundId TEXT UNIQUE NOT NULL,
+  crashPoint REAL NOT NULL,
+  startTime DATETIME NOT NULL,
+  endTime DATETIME NOT NULL,
+  totalBets REAL DEFAULT 0,
+  totalWinnings REAL DEFAULT 0,
+  playerCount INTEGER DEFAULT 0,
+  seed TEXT NOT NULL,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ### Bet History
-```typescript
-{
-  userId: string;
-  username: string;
-  roundId: string;
-  betAmount: number;
-  cashoutAt?: number;
-  winAmount?: number;
-  cashouted: boolean;
-  betType: 'f' | 's';
-  isAuto: boolean;
-  target: number;
-  createdAt: Date;
-}
+```sql
+CREATE TABLE bet_history (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  username TEXT NOT NULL,
+  roundId TEXT NOT NULL,
+  betAmount REAL NOT NULL,
+  cashoutAt REAL,
+  winAmount REAL DEFAULT 0,
+  cashouted BOOLEAN DEFAULT false,
+  betType TEXT NOT NULL,
+  isAuto BOOLEAN DEFAULT false,
+  target REAL NOT NULL,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (roundId) REFERENCES game_history(roundId) ON DELETE CASCADE
+);
 ```
 
-## 🔧 Configuration
+## 🔧 Prisma Commands
 
-### Environment Variables
-- `PORT`: Server port (default: 3001)
-- `MONGODB_URI`: MongoDB connection string
-- `JWT_SECRET`: Secret key for JWT tokens
-- `MIN_BET`: Minimum bet amount
-- `MAX_BET`: Maximum bet amount
-- `GAME_DURATION`: Betting phase duration in ms
-- `CRASH_PROBABILITY`: House edge probability
-- `FRONTEND_URL`: Frontend URL for CORS
+```bash
+# Generate Prisma client
+npx prisma generate
 
-### Game Settings
-- Betting phase: 5 seconds
-- Update interval: 50ms
-- Results delay: 3 seconds
-- History limit: 50 rounds
-- Auto-cashout support
-- Dual betting (f/s types)
+# Push schema to database
+npx prisma db push
+
+# Create migration
+npx prisma migrate dev --name init
+
+# View database in browser
+npx prisma studio
+
+# Seed database
+npm run db:seed
+
+# Reset database
+npx prisma migrate reset
+```
 
 ## 🚀 Deployment
 
 ### Production Setup
 1. Set `NODE_ENV=production`
 2. Use a process manager (PM2)
-3. Set up MongoDB replica set
-4. Configure reverse proxy (Nginx)
-5. Enable SSL/TLS
-6. Set up monitoring and logging
+3. Set up reverse proxy (Nginx)
+4. Enable SSL/TLS
+5. Set up monitoring and logging
+6. Backup SQLite database regularly
 
 ### Docker Support
 ```dockerfile
@@ -209,6 +215,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 COPY dist ./dist
+COPY prisma ./prisma
+RUN npx prisma generate
 EXPOSE 3001
 CMD ["node", "dist/server.js"]
 ```
@@ -228,29 +236,32 @@ npm run test:coverage
 ### Project Structure
 ```
 src/
-├── config/          # Database and app configuration
-├── models/          # MongoDB schemas
+├── config/          # Database configuration
 ├── services/        # Business logic
 ├── routes/          # API routes
 ├── middleware/      # Express middleware
 ├── utils/           # Utility functions
 └── server.ts        # Main server file
+
+prisma/
+├── schema.prisma    # Database schema
+├── seed.ts          # Database seeding
+└── dev.db          # SQLite database file
 ```
 
-### Code Style
-- TypeScript strict mode
-- ESLint configuration
-- Prettier formatting
-- Conventional commits
+### Demo Users
+After running `npm run db:seed`:
+- **Email**: demo@aviator.com **Password**: demo123
+- **Email**: test@aviator.com **Password**: test123
 
 ## 🔒 Security
 
 - Password hashing with bcrypt
 - JWT token authentication
 - Input validation and sanitization
-- Rate limiting (recommended)
 - CORS configuration
 - Environment variable protection
+- SQLite file permissions
 
 ## 📈 Monitoring
 
@@ -259,6 +270,26 @@ src/
 - Performance metrics
 - Database connection monitoring
 - WebSocket connection tracking
+
+## 🗄️ Database Management
+
+### Backup SQLite Database
+```bash
+# Create backup
+cp prisma/dev.db prisma/backup-$(date +%Y%m%d).db
+
+# Restore backup
+cp prisma/backup-20241201.db prisma/dev.db
+```
+
+### View Database
+```bash
+# Open Prisma Studio
+npx prisma studio
+
+# Or use SQLite CLI
+sqlite3 prisma/dev.db
+```
 
 ## 🤝 Contributing
 

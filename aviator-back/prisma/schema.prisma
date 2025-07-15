@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -55,7 +55,7 @@ model BetHistory {
   cashoutAt  Float?
   winAmount  Float    @default(0)
   cashouted  Boolean  @default(false)
-  betType    BetType
+  betType    String   // 'f' or 's'
   isAuto     Boolean  @default(false)
   target     Float
   createdAt  DateTime @default(now())
@@ -64,13 +64,5 @@ model BetHistory {
   user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   game GameHistory @relation(fields: [roundId], references: [roundId], onDelete: Cascade)
 
-  @@index([userId, createdAt])
-  @@index([roundId])
-  @@index([username, createdAt])
   @@map("bet_history")
-}
-
-enum BetType {
-  f
-  s
 }

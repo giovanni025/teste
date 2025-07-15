@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { User, IUser } from '../models/User';
+import { prisma } from '../config/database';
+import bcrypt from 'bcryptjs';
 
 export interface AuthenticatedUser {
   id: string;
@@ -29,21 +30,26 @@ export class UserService {
       const decoded = jwt.verify(token, this.JWT_SECRET) as any;
       
       // Find user in database
-      const user = await User.findById(decoded.userId);
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
+      });
+
       if (!user || !user.isActive) {
         return null;
       }
 
       // Update last login
-      user.lastLogin = new Date();
-      await user.save();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() }
+      });
 
       return {
-        id: user._id.toString(),
+        id: user.id,
         username: user.username,
         email: user.email,
         balance: user.balance,
-        avatar: user.avatar
+        avatar: user.avatar || undefined
       };
 
     } catch (error) {
@@ -59,11 +65,13 @@ export class UserService {
   }): Promise<{ success: boolean; user?: AuthenticatedUser; message?: string }> {
     try {
       // Check if user already exists
-      const existingUser = await User.findOne({
-        $or: [
-          { email: userData.email },
-          { username: userData.username }
-        ]
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: userData.email },
+            { username: userData.username }
+          ]
+        }
       });
 
       if (existingUser) {
@@ -73,18 +81,26 @@ export class UserService {
         };
       }
 
+      // Hash password
+      const hashedPassword = await bcrypt.hash(userData.password, 12);
+
       // Create new user
-      const user = new User(userData);
-      await user.save();
+      const user = await prisma.user.create({
+        data: {
+          username: userData.username,
+          email: userData.email,
+          password: hashedPassword
+        }
+      });
 
       return {
         success: true,
         user: {
-          id: user._id.toString(),
+          id: user.id,
           username: user.username,
           email: user.email,
           balance: user.balance,
-          avatar: user.avatar
+          avatar: user.avatar || undefined
         }
       };
 
@@ -103,7 +119,10 @@ export class UserService {
   }): Promise<{ success: boolean; token?: string; user?: AuthenticatedUser; message?: string }> {
     try {
       // Find user by email
-      const user = await User.findOne({ email: credentials.email });
+      const user = await prisma.user.findUnique({
+        where: { email: credentials.email }
+      });
+
       if (!user || !user.isActive) {
         return {
           success: false,
@@ -112,7 +131,7 @@ export class UserService {
       }
 
       // Check password
-      const isPasswordValid = await user.comparePassword(credentials.password);
+      const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
       if (!isPasswordValid) {
         return {
           success: false,
@@ -122,24 +141,26 @@ export class UserService {
 
       // Generate JWT token
       const token = jwt.sign(
-        { userId: user._id },
+        { userId: user.id },
         this.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
       // Update last login
-      user.lastLogin = new Date();
-      await user.save();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() }
+      });
 
       return {
         success: true,
         token,
         user: {
-          id: user._id.toString(),
+          id: user.id,
           username: user.username,
           email: user.email,
           balance: user.balance,
-          avatar: user.avatar
+          avatar: user.avatar || undefined
         }
       };
 
@@ -154,19 +175,21 @@ export class UserService {
 
   public async updateBalance(userId: string, amount: number): Promise<boolean> {
     try {
-      const user = await User.findById(userId);
+      const user = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
       if (!user) {
         return false;
       }
 
-      user.balance += amount;
-      
-      // Ensure balance doesn't go negative
-      if (user.balance < 0) {
-        user.balance = 0;
-      }
+      const newBalance = Math.max(0, user.balance + amount);
 
-      await user.save();
+      await prisma.user.update({
+        where: { id: userId },
+        data: { balance: newBalance }
+      });
+
       return true;
 
     } catch (error) {
@@ -177,7 +200,11 @@ export class UserService {
 
   public async getUserBalance(userId: string): Promise<number | null> {
     try {
-      const user = await User.findById(userId);
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { balance: true }
+      });
+
       return user ? user.balance : null;
     } catch (error) {
       console.error('Error getting user balance:', error);
@@ -187,15 +214,14 @@ export class UserService {
 
   public async getUserBetHistory(userId: string, limit: number = 50): Promise<any[]> {
     try {
-      const { BetHistory } = await import('../models/BetHistory');
-      
-      const history = await BetHistory.find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .lean();
+      const history = await prisma.betHistory.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+      });
 
       return history.map(bet => ({
-        _id: bet._id,
+        _id: bet.id,
         name: bet.username,
         betAmount: bet.betAmount,
         cashoutAt: bet.cashoutAt || 0,

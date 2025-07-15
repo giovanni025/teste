@@ -1,40 +1,39 @@
-import mongoose from 'mongoose';
+import { PrismaClient } from '@prisma/client';
+
+declare global {
+  var __prisma: PrismaClient | undefined;
+}
+
+// Prevent multiple instances of Prisma Client in development
+export const prisma = globalThis.__prisma || new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+});
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.__prisma = prisma;
+}
 
 export const connectDatabase = async (): Promise<void> => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/aviator-game';
-    
-    await mongoose.connect(mongoUri, {
-      // Remove deprecated options
-    });
+    await prisma.$connect();
+    console.log('✅ Connected to SQLite database');
 
-    console.log('✅ Connected to MongoDB');
-
-    // Handle connection events
-    mongoose.connection.on('error', (error) => {
-      console.error('❌ MongoDB connection error:', error);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('📡 MongoDB disconnected');
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      console.log('🔄 MongoDB reconnected');
-    });
+    // Test the connection
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('🔍 Database connection test successful');
 
   } catch (error) {
-    console.error('❌ Failed to connect to MongoDB:', error);
+    console.error('❌ Failed to connect to database:', error);
     throw error;
   }
 };
 
 export const disconnectDatabase = async (): Promise<void> => {
   try {
-    await mongoose.disconnect();
-    console.log('✅ Disconnected from MongoDB');
+    await prisma.$disconnect();
+    console.log('✅ Disconnected from SQLite database');
   } catch (error) {
-    console.error('❌ Error disconnecting from MongoDB:', error);
+    console.error('❌ Error disconnecting from database:', error);
     throw error;
   }
 };

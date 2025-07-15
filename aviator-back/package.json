@@ -14,7 +14,7 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts"
   },
-  "keywords": ["aviator", "crash", "game", "websocket", "sql", "postgresql"],
+  "keywords": ["aviator", "crash", "game", "websocket", "sql", "sqlite"],
   "author": "Aviator Game Team",
   "license": "MIT",
   "dependencies": {

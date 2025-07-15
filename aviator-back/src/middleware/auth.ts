@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { Socket } from 'socket.io';
-import { User } from '../models/User';
+import { prisma } from '../config/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -29,7 +29,9 @@ export const authenticateToken = async (
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = await User.findById(decoded.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
 
     if (!user || !user.isActive) {
       res.status(403).json({ error: 'Invalid or expired token' });
@@ -37,7 +39,7 @@ export const authenticateToken = async (
     }
 
     req.user = {
-      id: user._id.toString(),
+      id: user.id,
       username: user.username,
       email: user.email,
       balance: user.balance
@@ -61,14 +63,16 @@ export const authenticateSocket = async (socket: Socket, next: Function): Promis
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const user = await User.findById(decoded.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
 
     if (!user || !user.isActive) {
       return next(new Error('Authentication failed'));
     }
 
     socket.data.user = {
-      id: user._id.toString(),
+      id: user.id,
       username: user.username,
       email: user.email,
       balance: user.balance,
@@ -94,11 +98,13 @@ export const optionalAuth = async (
 
     if (token) {
       const decoded = jwt.verify(token, JWT_SECRET) as any;
-      const user = await User.findById(decoded.userId);
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId }
+      });
 
       if (user && user.isActive) {
         req.user = {
-          id: user._id.toString(),
+          id: user.id,
           username: user.username,
           email: user.email,
           balance: user.balance
