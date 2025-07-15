@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  balance   Float    @default(1000)
+  avatar    String?
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bets BetHistory[]
+
+  @@map("users")
+}
+
+model GameHistory {
+  id            String   @id @default(cuid())
+  roundId       String   @unique
+  crashPoint    Float
+  startTime     DateTime
+  endTime       DateTime
+  totalBets     Float    @default(0)
+  totalWinnings Float    @default(0)
+  playerCount   Int      @default(0)
+  seed          String
+  createdAt     DateTime @default(now())
+
+  // Relations
+  bets BetHistory[]
+
+  @@map("game_history")
+}
+
+model BetHistory {
+  id         String   @id @default(cuid())
+  userId     String
+  username   String
+  roundId    String
+  betAmount  Float
+  cashoutAt  Float?
+  winAmount  Float    @default(0)
+  cashouted  Boolean  @default(false)
+  betType    BetType
+  isAuto     Boolean  @default(false)
+  target     Float
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game GameHistory @relation(fields: [roundId], references: [roundId], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([roundId])
+  @@index([username, createdAt])
+  @@map("bet_history")
+}
+
+enum BetType {
+  f
+  s
+}
