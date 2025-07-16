@@ -3,11 +3,13 @@ import Header from "./components/header";
 import BetsUsers from "./components/bet-users";
 import Main from "./components/Main";
 // import { useCrashContext } from "./components/Main/context";
-import propeller from "./assets/images/propeller.png";
 
 import Context from "./context";
 import { ContactMeTelegram } from "./components/cTelegram";
 // import "./App.scss";
+
+// Import propeller image
+const propeller = "/src/assets/images/propeller.png";
 
 function App() {
   const { unityLoading, currentProgress, rechargeState } =

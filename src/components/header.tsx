@@ -1,9 +1,12 @@
 import React from "react";
 
-import logo from "../assets/images/logo.svg";
-import refound from "../assets/images/refund.png";
 import "../index.scss";
 import Context from "../context";
+
+// Import images using public path
+const logo = "/src/assets/images/logo.svg";
+const refound = "/src/assets/images/refund.png";
+
 export default function Header() {
   const { state } = React.useContext(Context)
 

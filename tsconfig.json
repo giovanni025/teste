@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es5",
-		"lib": ["es5", "es6", "es2017", "es2020", "dom"],
+    "lib": ["es5", "es6", "es2017", "es2020", "dom"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -12,17 +12,22 @@
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "sourceMap": false,
-    "isolatedModules": true,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "declaration": false,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
   },
   "include": [
-    "src"
+    "src",
+    "src/@types"
   ],
-  "typeRoots": [
-    "./node_modules/@types",
-    "./src/@types"
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist"
   ]
 }
