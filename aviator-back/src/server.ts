@@ -110,13 +110,13 @@ io.on('connection', (socket) => {
       const { betAmount, target, type, auto } = data;
       const user = socket.data.user;
 
-      if (!user && socket.data.authenticated) {
-        socket.emit('error', { message: 'Authentication required', index: type });
-        return;
-      }
+      // Allow demo users to play
+      const userId = user?.id || socket.id;
+      const username = user?.username || 'demo_user';
+      const userBalance = user?.balance || 1000;
 
       // Validate bet
-      const validation = gameManager.validateBet(betAmount, user?.balance || 1000);
+      const validation = gameManager.validateBet(betAmount, userBalance);
       if (!validation.valid) {
         socket.emit('error', { message: validation.message, index: type });
         return;
@@ -124,9 +124,9 @@ io.on('connection', (socket) => {
 
       // Place bet
       const bet = await gameManager.placeBet({
-        userId: user?.id || socket.id,
-        username: user?.username || 'demo_user',
-        avatar: user?.avatar || '',
+        userId,
+        username,
+        avatar: user?.avatar || '/avatars/av-5.png',
         betAmount,
         target,
         type,
@@ -146,9 +146,6 @@ io.on('connection', (socket) => {
           f: { betted: type === 'f' },
           s: { betted: type === 's' }
         });
-
-        // Broadcast updated bets to all users
-        io.to('game-room').emit('bettedUserInfo', gameManager.getCurrentBets());
         
         socket.emit('success', 'Bet placed successfully!');
       } else {
@@ -166,9 +163,10 @@ io.on('connection', (socket) => {
     try {
       const { type, endTarget } = data;
       const user = socket.data.user;
+      const userId = user?.id || socket.id;
 
       const result = await gameManager.cashOut({
-        userId: user?.id || socket.id,
+        userId,
         type,
         multiplier: endTarget,
         socketId: socket.id
@@ -180,9 +178,6 @@ io.on('connection', (socket) => {
           await userService.updateBalance(user.id, result.winAmount);
           user.balance += result.winAmount;
         }
-
-        // Broadcast updated bets
-        io.to('game-room').emit('bettedUserInfo', gameManager.getCurrentBets());
         
         socket.emit('success', `Cashed out at ${endTarget}x!`);
       } else {

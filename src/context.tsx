@@ -52,6 +52,9 @@ interface GameStatusType {
   currentSecondNum: number;
   GameState: string;
   time: number;
+  roundId?: string;
+  crashPoint?: number;
+  bettingTimeLeft?: number;
 }
 
 interface GameBetLimit {

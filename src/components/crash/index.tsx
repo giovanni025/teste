@@ -11,7 +11,7 @@ const propeller = "/src/assets/images/propeller.png";
 let currentFlag = 0;
 
 export default function WebGLStarter() {
-	const { GameState, currentNum, time, unityState, myUnityContext,setCurrentTarget } = React.useContext(Context)
+	const { GameState, currentNum, time, unityState, myUnityContext, setCurrentTarget, bettingTimeLeft } = React.useContext(Context)
 	const [target, setTarget] = React.useState(1);
 	const [waiting, setWaiting] = React.useState(0);
 	const [flag, setFlag] = React.useState(1);
@@ -20,39 +20,31 @@ export default function WebGLStarter() {
 		let myInterval;
 		if (GameState === "PLAYING") {
 			setFlag(2);
-			let startTime = Date.now() - time;
-			let currentTime;
-			let currentNum;
-			const getCurrentTime = (e) => {
-				currentTime = (Date.now() - startTime) / 1000;
-				currentNum = 1 + 0.06 * currentTime + Math.pow((0.06 * currentTime), 2) - Math.pow((0.04 * currentTime), 3) + Math.pow((0.04 * currentTime), 4);
-				if (currentNum > 2 && e === 2) {
-					setFlag(3);
-				} else if (currentNum > 10 && e === 3) {
-					setFlag(4);
-				}
-				setTarget(currentNum);
-				setCurrentTarget(currentNum);
+			// Use server-provided multiplier directly
+			setTarget(currentNum);
+			setCurrentTarget(currentNum);
+			
+			// Update flag based on multiplier for visual effects
+			if (currentNum > 2 && flag === 2) {
+				setFlag(3);
+			} else if (currentNum > 10 && flag === 3) {
+				setFlag(4);
 			}
-			myInterval = setInterval(() => {
-				getCurrentTime(currentFlag);
-			}, 20);
 		} else if (GameState === "GAMEEND") {
 			setFlag(5);
 			setCurrentTarget(currentNum);
 			setTarget(currentNum);
 		} else if (GameState === "BET") {
 			setFlag(1);
-			let startWaiting = Date.now() - time;
 			setTarget(1);
 			setCurrentTarget(1);
-
-			myInterval = setInterval(() => {
-				setWaiting(Date.now() - startWaiting);
-			}, 20);
+			
+			// Use server-provided betting time left
+			if (bettingTimeLeft !== undefined) {
+				setWaiting(5000 - bettingTimeLeft);
+			}
 		}
-		return () => clearInterval(myInterval);
-	}, [GameState, unityState])
+	}, [GameState, currentNum, bettingTimeLeft, flag, setCurrentTarget])
 
 	React.useEffect(() => {
 		myUnityContext?.send("GameManager", "RequestToken", JSON.stringify({
@@ -74,7 +66,7 @@ export default function WebGLStarter() {
 						</div>
 						<div className="waiting-font">WAITING FOR NEXT ROUND</div>
 						<div className="waiting">
-							<div style={{ width: `${(5000 - waiting) * 100 / 5000}%` }}></div>
+							<div style={{ width: `${Math.max(0, (5000 - waiting) * 100 / 5000)}%` }}></div>
 						</div>
 					</div>
 				) : (
